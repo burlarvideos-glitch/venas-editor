@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Venas PDF Editor — Edição Direta</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#111;color:#eee;font-family:Arial,sans-serif}
+header{position:sticky;top:0;z-index:20;background:#181818;border-bottom:1px solid #333;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,.fileLabel{border:0;border-radius:8px;padding:10px 14px;background:#2d7ff9;color:white;font-weight:700;cursor:pointer}
+button.secondary{background:#333}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+#status{font-size:13px;color:#bbb;margin-left:4px}
+#pages{padding:20px;display:flex;flex-direction:column;gap:24px;align-items:center}
+.pageWrap{position:relative;box-shadow:0 8px 30px #000;background:#fff;overflow:hidden}
+.pageWrap canvas{display:block}
+.editLayer{position:absolute;inset:0;pointer-events:none}
+.editItem{position:absolute;margin:0;padding:0;border:1px solid transparent;background:transparent;color:transparent;outline:none;white-space:pre;overflow:visible;pointer-events:auto;cursor:text;font-family:Arial,sans-serif;line-height:1}
+.editItem:hover{border-color:rgba(45,127,249,.65)}
+.editItem:focus{color:#111;background:rgba(255,255,255,.96);border:1px solid #2d7ff9;border-radius:2px;padding:1px 2px;z-index:5}
+.editItem.changed{color:#111;background:rgba(255,255,255,.96);border-color:#2d7ff9}
+.help{max-width:900px;margin:0 auto 18px;color:#bbb;text-align:center;font-size:13px;line-height:1.45}
+.badge{padding:6px 9px;border-radius:999px;background:#263238;color:#9ad0ff;font-size:12px}
+@media(max-width:700px){header{position:sticky}.fileLabel,button{padding:9px 11px}#pages{padding:8px}.help{padding:0 10px}}
+</style>
+</head>
+<body>
+<header>
+<label class="fileLabel" for="pdfFile">📄 Carregar PDF</label>
+<input id="pdfFile" type="file" accept="application/pdf">
+<button id="download" disabled>💾 Baixar PDF</button>
+<button id="revert" class="secondary" disabled>↩ Desfazer última edição</button>
+<span class="badge">Edição direta do texto</span>
+<span id="status">Aguardando PDF…</span>
+</header>
+<div class="help">
+Clique em qualquer texto detectado para editar. Você pode apagar letras, inserir no meio, selecionar uma parte e substituir ou apagar o texto inteiro.
+A alteração é aplicada ao conteúdo do PDF; não é criada uma tarja branca/preta para esconder o original.
+</div>
+<div id="pages"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const fileInput=document.getElementById('pdfFile');
+const pagesEl=document.getElementById('pages');
+const statusEl=document.getElementById('status');
+const downloadBtn=document.getElementById('download');
+const revertBtn=document.getElementById('revert');
+
+let currentBytes=null;
+let undoBytes=null;
+let pdfjsDoc=null;
+let editCounter=0;
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function setStatus(s){statusEl.textContent=s}
+
+function hexToBytes(hex){
+  hex=hex.replace(/[^0-9a-f]/gi,'');
+  if(hex.length%2) hex+='0';
+  const a=new Uint8Array(hex.length/2);
+  for(let i=0;i<a.length;i++) a[i]=parseInt(hex.slice(i*2,i*2+2),16);
+  return a;
+}
+function utf16HexToText(hex){
+  const b=hexToBytes(hex);
+  let s='';
+  for(let i=0;i+1<b.length;i+=2)s+=String.fromCharCode((b[i]<<8)|b[i+1]);
+  return s;
+}
+function parseCMap(bytes){
+  const s=new TextDecoder('latin1').decode(bytes);
+  const map=new Map();
+  const body=(s.split('beginbfchar')[1]||'').split('endbfchar')[0];
+  for(const m of body.matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g)){
+    const code=parseInt(m[1],16);
+    let out;
+    try{out=utf16HexToText(m[2])}catch(e){out=''}
+    if(out)map.set(code,out);
+  }
+  // Basic bfrange support
+  const ranges=(s.split('beginbfrange')[1]||'').split('endbfrange')[0];
+  for(const m of ranges.matchAll(/<([0-9A-Fa-f]+)>\s+<([0-9A-Fa-f]+)>\s+<([0-9A-Fa-f]+)>/g)){
+    let a=parseInt(m[1],16), b=parseInt(m[2],16), c=parseInt(m[3],16);
+    for(let k=a;k<=b;k++){
+      const u=(c+(k-a)).toString(16).padStart(4,'0');
+      try{map.set(k,utf16HexToText(u))}catch(e){}
+    }
+  }
+  return map;
+}
+function decodeHexText(hex,map){
+  const bytes=hexToBytes(hex);
+  let out='';
+  for(const b of bytes)out+=map.get(b) ?? '�';
+  return out;
+}
+function parseLiteralString(raw){
+  let s=raw.slice(1,-1),out='';
+  for(let i=0;i<s.length;i++){
+    if(s[i]!=='\\'){out+=s[i];continue}
+    i++;
+    if(i>=s.length)break;
+    const c=s[i];
+    const esc={n:'\n',r:'\r',t:'\t',b:'\b',f:'\f'};
+    if(esc[c]!==undefined){out+=esc[c];continue}
+    if(/[0-7]/.test(c)){
+      let oct=c;
+      for(let j=0;j<2&&i+1<s.length&&/[0-7]/.test(s[i+1]);j++)oct+=s[++i];
+      out+=String.fromCharCode(parseInt(oct,8));continue;
+    }
+    out+=c;
+  }
+  return out;
+}
+function decodeShowArg(arg,map){
+  arg=arg.trim();
+  if(arg.startsWith('<') && arg.endsWith('>'))return decodeHexText(arg.slice(1,-1),map);
+  if(arg.startsWith('[')){
+    let t='';
+    for(const m of arg.matchAll(/<([0-9A-Fa-f]+)>|\((?:\\.|[^)])*\)/g)){
+      const z=m[0];
+      t+=z[0]==='<'?decodeHexText(z.slice(1,-1),map):parseLiteralString(z);
+    }
+    return t;
+  }
+  return '';
+}
+function encodeWithMap(text,reverse){
+  const codes=[];
+  for(const ch of text){
+    if(reverse.has(ch))codes.push(reverse.get(ch));
+    else return null;
+  }
+  return codes.map(n=>n.toString(16).padStart(2,'0')).join('');
+}
+function extractOps(stream,mapByFont){
+  const ops=[];
+  const btRe=/BT([\s\S]*?)ET/g;
+  let block;
+  while((block=btRe.exec(stream))){
+    const body=block[1], base=block.index+2;
+    let font=null, lastTf=0;
+    const tokenRe=/(\/[A-Za-z0-9_.#-]+)\s+(-?(?:\d+(?:\.\d*)?|\.\d+))\s+Tf|(<[0-9A-Fa-f]*>|\[[\s\S]*?\]|\((?:\\.|[^)])*\))\s*(TJ|Tj)/g;
+    let m;
+    while((m=tokenRe.exec(body))){
+      if(m[1]){
+        font=m[1].slice(1); lastTf=m.index; continue;
+      }
+      if(!font)continue;
+      const arg=m[3], op=m[4], map=mapByFont[font];
+      if(!map)continue;
+      const text=decodeShowArg(arg,map);
+      ops.push({start:base+m.index,end:base+m.index+m[0].length,font,op,arg,text,streamOffset:0});
+    }
+  }
+  return ops;
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+async function getFontMaps(pdfDoc,page){
+  const maps={};
+  const resources=page.node.Resources();
+  const fonts=resources.lookup(PDFLib.PDFName.of('Font'),PDFLib.PDFDict);
+  const seen=new Set();
+  // We only need font names actually present in content.
+  const contents=page.node.Contents();
+  const refs=contents instanceof PDFLib.PDFArray ? contents.asArray() : [contents];
+  for(const r of refs){
+    const ref=r instanceof PDFLib.PDFRef?r:null;
+    const stream=ref?pdfDoc.context.lookup(ref,PDFLib.PDFStream):r;
+    if(!stream)continue;
+    const decoded=PDFLib.decodePDFRawStream(stream).decode();
+    const str=new TextDecoder('latin1').decode(decoded);
+    for(const m of str.matchAll(/\/([A-Za-z0-9_.#-]+)\s+-?(?:\d+(?:\.\d*)?|\.\d+)\s+Tf/g)){
+      const name=m[1]; if(seen.has(name))continue; seen.add(name);
+      try{
+        const font=fonts.lookup(PDFLib.PDFName.of(name),PDFLib.PDFDict);
+        const tu=font.get(PDFLib.PDFName.of('ToUnicode'));
+        if(tu){
+          const ts=pdfDoc.context.lookup(tu,PDFLib.PDFStream);
+          const cm=parseCMap(PDFLib.decodePDFRawStream(ts).decode());
+          maps[name]=cm;
+        }
+      }catch(e){}
+    }
+  }
+  return maps;
+}
+function reverseMaps(mapByFont){
+  const out={};
+  for(const [font,map] of Object.entries(mapByFont)){
+    const r=new Map();
+    for(const [code,text] of map.entries()){
+      if(text && !r.has(text))r.set(text,code);
+    }
+    out[font]=r;
+  }
+  return out;
+}
+
+async function structuralApply(bytes,changes){
+  const doc=await PDFLib.PDFDocument.load(new Uint8Array(bytes));
+  const pages=doc.getPages();
+  const grouped={};
+  for(const c of changes) (grouped[c.page]??=[]).push(c);
+
+  for(let pi=0;pi<pages.length;pi++){
+    const changesFor=grouped[pi]||[];
+    if(!changesFor.length)continue;
+    const page=pages[pi];
+    const mapByFont=await getFontMaps(doc,page);
+    const reverse=reverseMaps(mapByFont);
+    const contents=page.node.Contents();
+    const refs=contents instanceof PDFLib.PDFArray ? contents.asArray() : [contents];
+
+    for(const item of changesFor){
+      let targetDone=false;
+      for(const r of refs){
+        const ref=r instanceof PDFLib.PDFRef?r:null;
+        const stream=ref?doc.context.lookup(ref,PDFLib.PDFStream):r;
+        if(!stream)continue;
+        const decoded=PDFLib.decodePDFRawStream(stream).decode();
+        let source=new TextDecoder('latin1').decode(decoded);
+        const ops=extractOps(source,mapByFont);
+        const candidates=ops.filter(o=>o.font===item.font && o.text===item.oldText);
+        const target=candidates[item.occurrence||0];
+        if(!target)continue;
+
+        const encoded=encodeWithMap(item.newText,reverse[item.font]||new Map());
+        if(encoded===null){
+          throw new Error('O texto novo contém caracteres que a fonte original do PDF não possui. Tente usar letras/números presentes na fonte original.');
+        }
+        const replacement=`<${encoded}>${target.op}`;
+        source=source.slice(0,target.start)+replacement+source.slice(target.end);
+        const newStream=doc.context.flateStream(new TextEncoder().encode(source));
+        if(ref)doc.context.assign(ref,newStream);
+        else{
+          // Normally Contents is indirect. Keep this guard for unusual PDFs.
+          throw new Error('Fluxo de conteúdo direto não suportado nesta edição.');
+        }
+        targetDone=true;
+        break;
+      }
+      if(!targetDone)throw new Error('Não foi possível localizar o texto original dentro do conteúdo do PDF.');
+    }
+  }
+  return await doc.save();
+}
+
+async function renderPdf(bytes){
+  pagesEl.innerHTML='';
+  const loading=pdfjsLib.getDocument({data:new Uint8Array(bytes)});
+  pdfjsDoc=await loading.promise;
+  for(let i=0;i<pdfjsDoc.numPages;i++){
+    const page=await pdfjsDoc.getPage(i+1);
+    const baseViewport=page.getViewport({scale:1});
+    const maxWidth=Math.min(window.innerWidth-24,1100);
+    const scale=Math.min(1.8,Math.max(.45,maxWidth/baseViewport.width));
+    const viewport=page.getViewport({scale});
+    const wrap=document.createElement('div');
+    wrap.className='pageWrap';
+    wrap.dataset.page=i;
+    wrap.style.width=viewport.width+'px';
+    wrap.style.height=viewport.height+'px';
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.ceil(viewport.width);
+    canvas.height=Math.ceil(viewport.height);
+    canvas.style.width=viewport.width+'px';
+    canvas.style.height=viewport.height+'px';
+    wrap.appendChild(canvas);
+    const layer=document.createElement('div');
+    layer.className='editLayer';
+    wrap.appendChild(layer);
+    pagesEl.appendChild(wrap);
+    await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+    const tc=await page.getTextContent({disableCombineTextItems:false});
+    const rawMap=await getRawOperationsForDisplay(bytes,i);
+    const used=new Map();
+
+    for(const item of tc.items){
+      if(!item.str || !item.str.trim())continue;
+      const idx=findMatchingRaw(rawMap,item.str,used);
+      if(idx<0)continue;
+      const raw=rawMap[idx];
+      used.set(idx,true);
+      const tx=pdfjsLib.Util.transform(viewport.transform,item.transform);
+      const h=Math.max(8,Math.hypot(tx[2],tx[3]));
+      const x=tx[4], y=tx[5]-h;
+      const el=document.createElement('div');
+      el.className='editItem';
+      el.contentEditable='true';
+      el.spellcheck=false;
+      el.textContent=item.str;
+      el.dataset.page=i;
+      el.dataset.font=raw.font;
+      el.dataset.oldText=raw.text;
+      el.dataset.occurrence=raw.occurrence;
+      el.style.left=x+'px';
+      el.style.top=y+'px';
+      el.style.width=Math.max(item.width*scale+8,18)+'px';
+      el.style.height=Math.max(h*1.25,14)+'px';
+      el.style.fontSize=h+'px';
+      el.addEventListener('focus',()=>{el.classList.add('changed')});
+      el.addEventListener('keydown',e=>{
+        if(e.key==='Enter' && !e.shiftKey){e.preventDefault();el.blur()}
+        if(e.key==='Escape'){el.textContent=el.dataset.oldText;el.blur()}
+      });
+      el.addEventListener('blur',()=>commitEdit(el));
+      layer.appendChild(el);
+    }
+  }
+}
+
+async function getRawOperationsForDisplay(bytes,pageIndex){
+  const doc=await PDFLib.PDFDocument.load(new Uint8Array(bytes));
+  const page=doc.getPage(pageIndex);
+  const maps=await getFontMaps(doc,page);
+  const contents=page.node.Contents();
+  const refs=contents instanceof PDFLib.PDFArray?contents.asArray():[contents];
+  const out=[];
+  for(const r of refs){
+    const ref=r instanceof PDFLib.PDFRef?r:null;
+    const stream=ref?doc.context.lookup(ref,PDFLib.PDFStream):r;
+    if(!stream)continue;
+    const decoded=PDFLib.decodePDFRawStream(stream).decode();
+    const str=new TextDecoder('latin1').decode(decoded);
+    const ops=extractOps(str,maps);
+    const count={};
+    for(const o of ops){
+      const key=o.font+'|'+o.text;
+      const occurrence=count[key]||0; count[key]=occurrence+1;
+      o.occurrence=occurrence;
+      out.push(o);
+    }
+  }
+  return out;
+}
+function findMatchingRaw(raw,text,used){
+  const exact=raw.findIndex((o,i)=>!used.has(i)&&o.text===text);
+  if(exact>=0)return exact;
+  const norm=s=>s.replace(/\s+/g,' ').trim();
+  return raw.findIndex((o,i)=>!used.has(i)&&norm(o.text)===norm(text));
+}
+
+async function commitEdit(el){
+  const oldText=el.dataset.oldText;
+  const newText=el.textContent;
+  if(newText===oldText || el.dataset.busy==='1')return;
+  el.dataset.busy='1';
+  setStatus('Aplicando alteração diretamente no conteúdo do PDF…');
+  try{
+    undoBytes=currentBytes.slice();
+    const changes=[{
+      page:+el.dataset.page,
+      font:el.dataset.font,
+      oldText,
+      newText,
+      occurrence:+el.dataset.occurrence
+    }];
+    const newBytes=await structuralApply(currentBytes,changes);
+    currentBytes=newBytes;
+    editCounter++;
+    await renderPdf(currentBytes);
+    revertBtn.disabled=false;
+    downloadBtn.disabled=false;
+    setStatus('Alteração aplicada. O texto original foi substituído no conteúdo do PDF.');
+  }catch(err){
+    console.error(err);
+    el.textContent=oldText;
+    alert('Não foi possível aplicar esta alteração diretamente.\\n\\n'+err.message);
+    setStatus('Edição não aplicada.');
+  }finally{
+    el.dataset.busy='0';
+  }
+}
+
+fileInput.addEventListener('change',async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  try{
+    setStatus('Carregando PDF…');
+    currentBytes=new Uint8Array(await file.arrayBuffer());
+    undoBytes=null; editCounter=0;
+    await renderPdf(currentBytes);
+    downloadBtn.disabled=false;
+    revertBtn.disabled=true;
+    setStatus('PDF carregado. Clique sobre um texto para editar.');
+  }catch(err){
+    console.error(err);
+    alert('Erro ao carregar o PDF:\\n\\n'+err.message);
+    setStatus('Erro ao carregar PDF.');
+  }
+});
+
+downloadBtn.addEventListener('click',()=>{
+  if(!currentBytes)return;
+  const blob=new Blob([currentBytes],{type:'application/pdf'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='PDF_editado_estrutural.pdf';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+
+revertBtn.addEventListener('click',async()=>{
+  if(!undoBytes)return;
+  const tmp=currentBytes;
+  currentBytes=undoBytes;
+  undoBytes=tmp;
+  await renderPdf(currentBytes);
+  setStatus('Última edição desfeita.');
+});
+</script>
+</body>
+</html>
