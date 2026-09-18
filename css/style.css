@@ -1,166 +1,322 @@
 * {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
+html,
 body {
-  margin: 0;
-  background: #111;
-  color: #eee;
-  font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+
+    width: 100%;
+    min-height: 100%;
+
+    font-family: Arial, Helvetica, sans-serif;
+
+    background: #202124;
+    color: #fff;
 }
 
-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
 
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
+/* =========================
+   BARRA SUPERIOR
+========================= */
 
-  padding: 10px;
+.toolbar {
 
-  background: #181818;
-  border-bottom: 1px solid #333;
+    position: sticky;
+    top: 0;
+
+    z-index: 1000;
+
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 10px 14px;
+
+    background: #171717;
+
+    border-bottom: 1px solid #333;
+
 }
+
+
+/* =========================
+   BOTÕES
+========================= */
 
 .btn {
-  border: 0;
-  border-radius: 8px;
 
-  padding: 10px 14px;
+    border: 0;
 
-  background: #333;
-  color: #fff;
+    border-radius: 7px;
 
-  font-weight: 700;
+    padding: 11px 16px;
 
-  cursor: pointer;
+    background: #333;
+
+    color: #fff;
+
+    font-size: 14px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+    user-select: none;
+
+}
+
+.btn:hover {
+
+    background: #444;
+
 }
 
 .btn.primary {
-  background: #1769e0;
+
+    background: #1769e0;
+
+}
+
+.btn.primary:hover {
+
+    background: #2879ee;
+
 }
 
 .btn:disabled {
-  opacity: .45;
-  cursor: not-allowed;
+
+    opacity: .45;
+
+    cursor: not-allowed;
+
 }
 
-#pdfFile {
-  display: none;
-}
+
+/* =========================
+   STATUS
+========================= */
 
 #status {
-  font-size: 13px;
-  color: #bbb;
+
+    color: #aaa;
+
+    font-size: 13px;
+
 }
+
+
+/* =========================
+   ÁREA DO PDF
+========================= */
 
 main {
-  padding: 16px;
+
+    width: 100%;
+
+    padding: 25px 15px 50px;
+
 }
 
-.help {
-  max-width: 1000px;
 
-  margin: 0 auto 16px;
+#viewer {
 
-  text-align: center;
+    display: flex;
 
-  color: #aaa;
+    flex-direction: column;
 
-  font-size: 13px;
+    align-items: center;
 
-  line-height: 1.45;
+    gap: 25px;
+
 }
 
-#pages {
-  display: flex;
-  flex-direction: column;
 
-  align-items: center;
+/* =========================
+   PÁGINA
+========================= */
 
-  gap: 24px;
+.pdf-page {
+
+    position: relative;
+
+    background: #fff;
+
+    box-shadow:
+        0 8px 30px rgba(0,0,0,.55);
+
+    overflow: hidden;
+
 }
 
-.page {
-  position: relative;
 
-  background: #fff;
+/* =========================
+   CANVAS
+========================= */
 
-  box-shadow: 0 8px 30px #000;
+.pdf-canvas {
 
-  overflow: hidden;
+    display: block;
+
+    position: absolute;
+
+    left: 0;
+    top: 0;
+
 }
 
-.page canvas {
-  display: block;
+
+/* =========================
+   CAMADA DE TEXTO
+========================= */
+
+.text-layer {
+
+    position: absolute;
+
+    left: 0;
+    top: 0;
+
+    width: 100%;
+    height: 100%;
+
+    overflow: hidden;
+
 }
 
-.textLayer {
-  position: absolute;
 
-  inset: 0;
+/* =========================
+   TEXTO EDITÁVEL
+========================= */
 
-  overflow: hidden;
+.editable-text {
 
-  line-height: 1;
+    position: absolute;
 
-  pointer-events: none;
+    margin: 0;
+    padding: 0;
+
+    display: block;
+
+    white-space: pre;
+
+    background: transparent;
+
+    border: 1px solid transparent;
+
+    outline: none;
+
+    color: #111;
+
+    cursor: text;
+
+    user-select: text;
+
+    transform-origin: 0 0;
+
 }
 
-.textItem {
-  position: absolute;
 
-  display: block;
+/*
+   Quando o mouse passa pelo texto
+*/
 
-  white-space: pre;
+.editable-text:hover {
 
-  pointer-events: auto;
+    border-color: rgba(23,105,224,.45);
 
-  color: transparent;
-
-  border: 1px solid transparent;
-
-  outline: 0;
-
-  cursor: text;
-
-  transform-origin: 0 0;
 }
 
-.textItem:hover {
-  border-color: #1769e0;
+
+/*
+   Texto sendo editado
+*/
+
+.editable-text:focus {
+
+    border: 1px solid #1769e0;
+
+    background: rgba(255,255,255,.15);
+
+    outline: none;
+
 }
 
-.textItem:focus,
-.textItem.editing {
-  color: #111;
 
-  background: rgba(255,255,255,.96);
+/*
+   Texto alterado
+*/
 
-  border-color: #1769e0;
+.editable-text.changed {
 
-  z-index: 5;
+    border-color: #1769e0;
+
 }
 
-.textItem.changed {
-  color: #111;
 
-  background: rgba(255,255,255,.96);
+/* =========================
+   MENSAGEM DE ERRO
+========================= */
 
-  border-color: #1769e0;
+.error {
+
+    margin: 30px auto;
+
+    max-width: 800px;
+
+    padding: 20px;
+
+    border-radius: 8px;
+
+    background: #3a1515;
+
+    color: #ff8a8a;
+
+    line-height: 1.5;
+
 }
+
+
+/* =========================
+   MOBILE
+========================= */
 
 @media (max-width: 700px) {
 
-  main {
-    padding: 8px;
-  }
+    .toolbar {
 
-  .btn {
-    padding: 9px 11px;
-  }
+        padding: 8px;
+
+        flex-wrap: wrap;
+
+    }
+
+    .btn {
+
+        padding: 9px 11px;
+
+        font-size: 13px;
+
+    }
+
+    #status {
+
+        width: 100%;
+
+    }
+
+    main {
+
+        padding: 10px 5px 30px;
+
+    }
+
+    #viewer {
+
+        gap: 15px;
+
+    }
 
 }
