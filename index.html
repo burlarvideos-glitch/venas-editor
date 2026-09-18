@@ -1,44 +1,153 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Venas PDF Editor</title>
-  <link rel="stylesheet" href="./css/style.css">
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Venas PDF Editor</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #202124;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+
+            padding: 12px;
+
+            background: #171717;
+
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            border-bottom: 1px solid #333;
+        }
+
+        #file {
+            display: none;
+        }
+
+        .button {
+            display: inline-block;
+
+            padding: 11px 16px;
+
+            border-radius: 7px;
+
+            background: #1769e0;
+
+            color: white;
+
+            font-weight: bold;
+
+            cursor: pointer;
+        }
+
+        #status {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        #viewer {
+            padding: 25px;
+
+            display: flex;
+            flex-direction: column;
+
+            align-items: center;
+
+            gap: 25px;
+        }
+
+        .page {
+            background: white;
+
+            box-shadow:
+                0 5px 25px rgba(0,0,0,.6);
+        }
+
+        canvas {
+            display: block;
+
+            max-width: 100%;
+            height: auto;
+        }
+
+        .error {
+            color: #ff6b6b;
+
+            max-width: 800px;
+
+            text-align: center;
+
+            padding: 20px;
+        }
+
+        @media(max-width:700px) {
+
+            #viewer {
+                padding: 8px;
+            }
+
+            header {
+                flex-wrap: wrap;
+            }
+
+        }
+    </style>
 </head>
 
 <body>
 
 <header>
-  <label class="btn primary" for="pdfFile">
-    📄 Carregar PDF
-  </label>
 
-  <input id="pdfFile" type="file" accept="application/pdf">
+    <label
+        class="button"
+        for="file"
+    >
+        📄 Carregar PDF
+    </label>
 
-  <button id="downloadBtn" class="btn" disabled>
-    💾 Baixar PDF
-  </button>
+    <input
+        id="file"
+        type="file"
+        accept="application/pdf"
+    >
 
-  <span id="status">
-    Aguardando PDF…
-  </span>
+    <span id="status">
+        Nenhum PDF carregado
+    </span>
+
 </header>
 
-<main>
 
-  <div class="help">
-    <b>Venas PDF Editor</b><br>
-    Carregue um PDF e clique sobre um texto detectado para editar.
-  </div>
+<div id="viewer"></div>
 
-  <section id="pages"></section>
 
-</main>
+<script
+    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+</script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
-<script src="./js/app.js"></script>
+<script
+    src="./js/pdf-viewer.js">
+</script>
 
 </body>
+
 </html>
