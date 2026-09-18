@@ -2,49 +2,61 @@
     box-sizing: border-box;
 }
 
+
 html,
 body {
+
     margin: 0;
     padding: 0;
 
     width: 100%;
     min-height: 100%;
 
-    font-family: Arial, Helvetica, sans-serif;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 
     background: #202124;
-    color: #fff;
+
+    color: #ffffff;
+
 }
 
 
-/* =========================
-   BARRA SUPERIOR
-========================= */
+/* =========================================================
+   BARRA
+========================================================= */
 
 .toolbar {
 
     position: sticky;
+
     top: 0;
 
     z-index: 1000;
 
     display: flex;
+
     align-items: center;
 
     gap: 10px;
+
+    flex-wrap: wrap;
 
     padding: 10px 14px;
 
     background: #171717;
 
-    border-bottom: 1px solid #333;
+    border-bottom:
+        1px solid #333;
 
 }
 
 
-/* =========================
+/* =========================================================
    BOTÕES
-========================= */
+========================================================= */
 
 .btn {
 
@@ -52,7 +64,8 @@ body {
 
     border-radius: 7px;
 
-    padding: 11px 16px;
+    padding:
+        11px 16px;
 
     background: #333;
 
@@ -68,11 +81,13 @@ body {
 
 }
 
+
 .btn:hover {
 
     background: #444;
 
 }
+
 
 .btn.primary {
 
@@ -80,11 +95,13 @@ body {
 
 }
 
+
 .btn.primary:hover {
 
     background: #2879ee;
 
 }
+
 
 .btn:disabled {
 
@@ -95,9 +112,9 @@ body {
 }
 
 
-/* =========================
+/* =========================================================
    STATUS
-========================= */
+========================================================= */
 
 #status {
 
@@ -108,15 +125,16 @@ body {
 }
 
 
-/* =========================
-   ÁREA DO PDF
-========================= */
+/* =========================================================
+   ÁREA PRINCIPAL
+========================================================= */
 
 main {
 
     width: 100%;
 
-    padding: 25px 15px 50px;
+    padding:
+        25px 15px 50px;
 
 }
 
@@ -134,9 +152,9 @@ main {
 }
 
 
-/* =========================
+/* =========================================================
    PÁGINA
-========================= */
+========================================================= */
 
 .pdf-page {
 
@@ -145,32 +163,31 @@ main {
     background: #fff;
 
     box-shadow:
-        0 8px 30px rgba(0,0,0,.55);
-
-    overflow: hidden;
+        0 8px 30px
+        rgba(0, 0, 0, .55);
 
 }
 
 
-/* =========================
+/* =========================================================
    CANVAS
-========================= */
+========================================================= */
 
 .pdf-canvas {
-
-    display: block;
 
     position: absolute;
 
     left: 0;
     top: 0;
 
+    display: block;
+
 }
 
 
-/* =========================
+/* =========================================================
    CAMADA DE TEXTO
-========================= */
+========================================================= */
 
 .text-layer {
 
@@ -187,101 +204,112 @@ main {
 }
 
 
-/* =========================
+/* =========================================================
    TEXTO EDITÁVEL
-========================= */
+========================================================= */
 
 .editable-text {
 
     position: absolute;
 
-    margin: 0;
-    padding: 0;
-
     display: block;
+
+    margin: 0;
+
+    padding: 0;
 
     white-space: pre;
 
-    background: transparent;
+    color: #111;
 
-    border: 1px solid transparent;
+    background:
+        transparent;
+
+    border:
+        1px solid transparent;
 
     outline: none;
-
-    color: #111;
 
     cursor: text;
 
     user-select: text;
 
-    transform-origin: 0 0;
+    transform-origin:
+        0 0;
 
 }
 
 
-/*
-   Quando o mouse passa pelo texto
-*/
+/* =========================================================
+   PASSAR O MOUSE
+========================================================= */
 
 .editable-text:hover {
 
-    border-color: rgba(23,105,224,.45);
+    border-color:
+        rgba(23, 105, 224, .55);
 
 }
 
 
-/*
-   Texto sendo editado
-*/
+/* =========================================================
+   EDITANDO
+========================================================= */
 
 .editable-text:focus {
 
-    border: 1px solid #1769e0;
+    border:
+        1px solid #1769e0;
 
-    background: rgba(255,255,255,.15);
+    background:
+        rgba(255, 255, 255, .12);
 
     outline: none;
 
 }
 
 
-/*
-   Texto alterado
-*/
+/* =========================================================
+   ALTERADO
+========================================================= */
 
 .editable-text.changed {
 
-    border-color: #1769e0;
+    border:
+        1px solid #1769e0;
 
 }
 
 
-/* =========================
-   MENSAGEM DE ERRO
-========================= */
+/* =========================================================
+   ERRO
+========================================================= */
 
 .error {
 
-    margin: 30px auto;
+    max-width: 850px;
 
-    max-width: 800px;
+    margin:
+        30px auto;
 
     padding: 20px;
 
     border-radius: 8px;
 
-    background: #3a1515;
+    background:
+        #3a1515;
 
-    color: #ff8a8a;
+    color:
+        #ff8585;
 
     line-height: 1.5;
 
 }
 
 
-/* =========================
+/* =========================================================
    MOBILE
-========================= */
+========================================================= */
 
 @media (max-width: 700px) {
 
@@ -289,17 +317,18 @@ main {
 
         padding: 8px;
 
-        flex-wrap: wrap;
-
     }
+
 
     .btn {
 
-        padding: 9px 11px;
+        padding:
+            9px 11px;
 
         font-size: 13px;
 
     }
+
 
     #status {
 
@@ -307,11 +336,14 @@ main {
 
     }
 
+
     main {
 
-        padding: 10px 5px 30px;
+        padding:
+            10px 5px 30px;
 
     }
+
 
     #viewer {
 
