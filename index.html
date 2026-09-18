@@ -1,23 +1,38 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
+
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Venas PDF Editor</title>
 
-    <link rel="stylesheet" href="./css/style.css">
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+
 </head>
+
 
 <body>
 
+
 <header class="toolbar">
 
-    <label for="fileInput" class="btn primary">
+
+    <label
+        for="fileInput"
+        class="btn primary"
+    >
         📄 Carregar PDF
     </label>
+
 
     <input
         id="fileInput"
@@ -25,6 +40,7 @@
         accept="application/pdf"
         hidden
     >
+
 
     <button
         id="saveBtn"
@@ -34,9 +50,11 @@
         💾 Salvar PDF
     </button>
 
+
     <span id="status">
         Nenhum PDF carregado
     </span>
+
 
 </header>
 
@@ -48,13 +66,27 @@
 </main>
 
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- PDF.JS -->
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script
+    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+</script>
+
+
+<!-- PDF-LIB -->
+
+<script
+    src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js">
+</script>
+
+
+<!-- Aplicação -->
 
 <script src="./js/pdf-viewer.js"></script>
 
 <script src="./js/pdf-editor.js"></script>
 
+
 </body>
+
 </html>
