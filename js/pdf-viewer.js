@@ -1,24 +1,43 @@
 "use strict";
 
 
-/* ==========================================================
+/* =========================================================
    VENAS PDF EDITOR
-   VISUALIZADOR
-========================================================== */
+   PDF VIEWER
+========================================================= */
 
+
+/* =========================================================
+   ELEMENTOS
+========================================================= */
 
 const fileInput =
-    document.getElementById("fileInput");
+    document.getElementById(
+        "fileInput"
+    );
+
 
 const viewer =
-    document.getElementById("viewer");
+    document.getElementById(
+        "viewer"
+    );
+
 
 const status =
-    document.getElementById("status");
+    document.getElementById(
+        "status"
+    );
+
 
 const saveBtn =
-    document.getElementById("saveBtn");
+    document.getElementById(
+        "saveBtn"
+    );
 
+
+/* =========================================================
+   VARIÁVEIS
+========================================================= */
 
 let currentPdf = null;
 
@@ -27,74 +46,101 @@ let originalPdfBytes = null;
 let pageData = [];
 
 
-/* ==========================================================
-   CONFIGURAÇÃO PDF.JS
-========================================================== */
+/* =========================================================
+   CONFIGURAÇÃO DO PDF.JS
+========================================================= */
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 
-/* ==========================================================
+/* =========================================================
    STATUS
-========================================================== */
+========================================================= */
 
-function setStatus(message) {
+function setStatus(
+    message
+) {
 
-    status.textContent = message;
+    status.textContent =
+        message;
 
 }
 
 
-/* ==========================================================
+/* =========================================================
    ERRO
-========================================================== */
+========================================================= */
 
-function showError(error) {
+function showError(
+    error
+) {
 
     console.error(
         "VENAS PDF ERROR:",
         error
     );
 
-    viewer.innerHTML = "";
+
+    viewer.innerHTML =
+        "";
+
 
     const box =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
-    box.className = "error";
+
+    box.className =
+        "error";
+
 
     box.textContent =
         "Erro ao carregar o PDF: " +
         (
-            error && error.message
+            error &&
+            error.message
                 ? error.message
                 : error
         );
 
-    viewer.appendChild(box);
 
-    setStatus("Erro ao carregar PDF.");
+    viewer.appendChild(
+        box
+    );
+
+
+    setStatus(
+        "Erro ao carregar PDF."
+    );
 
 }
 
 
-/* ==========================================================
-   CALCULAR ESCALA
-========================================================== */
+/* =========================================================
+   ESCALA
+========================================================= */
 
-function calculateScale(page) {
+function calculateScale(
+    page
+) {
 
     const baseViewport =
         page.getViewport({
+
             scale: 1
+
         });
 
 
     const availableWidth =
         Math.min(
+
             window.innerWidth - 30,
+
             1100
+
         );
 
 
@@ -105,11 +151,17 @@ function calculateScale(page) {
 
     scale =
         Math.max(
+
             0.45,
+
             Math.min(
+
                 scale,
+
                 1.8
+
             )
+
         );
 
 
@@ -118,155 +170,9 @@ function calculateScale(page) {
 }
 
 
-/* ==========================================================
-   IDENTIFICAR OPERAÇÕES DE TEXTO
-========================================================== */
-
-function isTextOperation(fn) {
-
-    const OPS =
-        pdfjsLib.OPS;
-
-
-    return (
-
-        fn === OPS.showText ||
-
-        fn === OPS.showSpacedText ||
-
-        fn === OPS.nextLineShowText ||
-
-        fn === OPS.nextLineSetSpacingShowText
-
-    );
-
-}
-
-
-/* ==========================================================
-   RENDERIZAÇÃO SEM O TEXTO ORIGINAL
-========================================================== */
-
-async function renderBackgroundOnly(
-    page,
-    viewport,
-    canvas
-) {
-
-    /*
-       Pegamos as operações originais
-       da página.
-    */
-
-    const operatorList =
-        await page.getOperatorList();
-
-
-    /*
-       Criamos uma lista nova.
-
-       As operações que desenham texto
-       são removidas.
-
-       Imagens, linhas, formas,
-       fundos etc. continuam.
-    */
-
-    const filteredFns = [];
-
-    const filteredArgs = [];
-
-
-    for (
-        let i = 0;
-        i < operatorList.fnArray.length;
-        i++
-    ) {
-
-        const fn =
-            operatorList.fnArray[i];
-
-
-        if (
-            isTextOperation(fn)
-        ) {
-
-            continue;
-
-        }
-
-
-        filteredFns.push(fn);
-
-        filteredArgs.push(
-            operatorList.argsArray[i]
-        );
-
-    }
-
-
-    const filteredOperators = {
-
-        fnArray:
-            filteredFns,
-
-        argsArray:
-            filteredArgs
-
-    };
-
-
-    /*
-       Renderizador interno do PDF.js.
-    */
-
-    const graphics =
-        new pdfjsLib.CanvasGraphics(
-            canvas.getContext("2d"),
-            page.commonObjs,
-            page.objs,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
-
-
-    graphics.beginDrawing({
-
-        transform:
-            viewport.transform,
-
-        viewport:
-
-            viewport,
-
-        transparency:
-
-            false,
-
-        background:
-
-            "#ffffff"
-
-    });
-
-
-    await graphics.executeOperatorList(
-        filteredOperators
-    );
-
-
-    graphics.endDrawing();
-
-}
-
-
-/* ==========================================================
-   CRIAR CAMADA DE TEXTO
-========================================================== */
+/* =========================================================
+   CRIAR TEXTO EDITÁVEL
+========================================================= */
 
 async function createTextLayer(
     page,
@@ -275,34 +181,55 @@ async function createTextLayer(
 ) {
 
     const textLayer =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
+
 
     textLayer.className =
         "text-layer";
 
 
+    /*
+       Obtém o texto real
+       através da API oficial
+       do PDF.js.
+    */
+
     const textContent =
         await page.getTextContent({
 
-            normalizeWhitespace: false,
+            normalizeWhitespace:
+                false,
 
-            disableCombineTextItems: false
+            disableCombineTextItems:
+                false
 
         });
 
 
-    /*
-       Guarda os dados da página
-       para o editor.
-    */
-
     const textItems = [];
 
 
+    /*
+       Percorre cada trecho
+       de texto encontrado.
+    */
+
     for (
-        const item
-        of textContent.items
+        let i = 0;
+        i < textContent.items.length;
+        i++
     ) {
+
+        const item =
+            textContent.items[i];
+
+
+        /*
+           Ignora elementos
+           vazios.
+        */
 
         if (
             !item.str ||
@@ -315,14 +242,17 @@ async function createTextLayer(
 
 
         /*
-           Transformação original
-           fornecida pelo PDF.js.
+           Converte a posição
+           do PDF para a tela.
         */
 
         const tx =
             pdfjsLib.Util.transform(
+
                 viewport.transform,
+
                 item.transform
+
             );
 
 
@@ -330,56 +260,63 @@ async function createTextLayer(
 
         const b = tx[1];
 
-        const c = tx[2];
-
         const d = tx[3];
 
-        const e = tx[4];
+        const x = tx[4];
 
-        const f = tx[5];
+        const y = tx[5];
 
+
+        /*
+           Altura da fonte.
+        */
 
         const fontHeight =
             Math.max(
+
                 8,
-                Math.sqrt(
-                    b * b +
-                    d * d
+
+                Math.hypot(
+                    b,
+                    d
                 )
+
             );
 
 
-        const left =
-            e;
-
-
-        const top =
-            f - fontHeight;
-
+        /*
+           Dimensões.
+        */
 
         const width =
             Math.max(
+
                 item.width *
                 viewport.scale,
 
-                10
+                12
+
             );
 
 
         const height =
             Math.max(
-                fontHeight * 1.25,
 
-                12
+                fontHeight * 1.35,
+
+                14
+
             );
 
 
         /*
-           Elemento HTML editável.
+           Elemento HTML.
         */
 
         const span =
-            document.createElement("span");
+            document.createElement(
+                "span"
+            );
 
 
         span.className =
@@ -398,6 +335,10 @@ async function createTextLayer(
             item.str;
 
 
+        /*
+           Guarda o texto original.
+        */
+
         span.dataset.original =
             item.str;
 
@@ -407,16 +348,27 @@ async function createTextLayer(
 
 
         span.dataset.index =
-            textItems.length;
+            i;
 
+
+        /*
+           Posição.
+        */
 
         span.style.left =
-            left + "px";
+            x + "px";
 
 
         span.style.top =
-            top + "px";
+            (
+                y -
+                fontHeight
+            ) + "px";
 
+
+        /*
+           Tamanho.
+        */
 
         span.style.width =
             width + "px";
@@ -431,27 +383,47 @@ async function createTextLayer(
 
 
         /*
-           Rotação / escala do texto.
+           Fonte aproximada.
+        */
 
-           Mantemos a transformação
-           horizontal do PDF.
+        if (
+
+            textContent.styles &&
+
+            item.fontName &&
+
+            textContent.styles[
+                item.fontName
+            ]
+
+        ) {
+
+            const font =
+                textContent.styles[
+                    item.fontName
+                ];
+
+
+            if (
+                font.fontFamily
+            ) {
+
+                span.style.fontFamily =
+                    font.fontFamily;
+
+            }
+
+        }
+
+
+        /*
+           Rotação.
         */
 
         const angle =
             Math.atan2(
                 b,
                 a
-            );
-
-
-        const scaleX =
-            Math.sqrt(
-                a * a +
-                b * b
-            ) /
-            Math.max(
-                fontHeight,
-                1
             );
 
 
@@ -469,44 +441,13 @@ async function createTextLayer(
 
 
         /*
-           Fonte aproximada.
-
-           O PDF.js fornece
-           informações da fonte.
-        */
-
-        if (
-            textContent.styles &&
-            item.fontName &&
-            textContent.styles[item.fontName]
-        ) {
-
-            const style =
-                textContent.styles[
-                    item.fontName
-                ];
-
-
-            if (
-                style.fontFamily
-            ) {
-
-                span.style.fontFamily =
-                    style.fontFamily;
-
-            }
-
-        }
-
-
-        /*
-           Dados usados posteriormente
-           pelo editor.
+           Dados internos.
         */
 
         textItems.push({
 
-            element: span,
+            element:
+                span,
 
             originalText:
                 item.str,
@@ -515,10 +456,11 @@ async function createTextLayer(
                 pageNumber,
 
             x:
-                left,
+                x,
 
             y:
-                top,
+                y -
+                fontHeight,
 
             width:
                 width,
@@ -533,12 +475,15 @@ async function createTextLayer(
                 tx,
 
             fontName:
-                item.fontName || null
+                item.fontName ||
+                null
 
         });
 
 
-        textLayer.appendChild(span);
+        textLayer.appendChild(
+            span
+        );
 
     }
 
@@ -556,9 +501,9 @@ async function createTextLayer(
 }
 
 
-/* ==========================================================
-   RENDERIZAR UMA PÁGINA
-========================================================== */
+/* =========================================================
+   RENDERIZAR PÁGINA
+========================================================= */
 
 async function renderPage(
     page,
@@ -566,15 +511,27 @@ async function renderPage(
 ) {
 
     setStatus(
+
         "Renderizando página " +
         pageNumber +
         "..."
+
     );
 
 
-    const scale =
-        calculateScale(page);
+    /*
+       Escala.
+    */
 
+    const scale =
+        calculateScale(
+            page
+        );
+
+
+    /*
+       Viewport.
+    */
 
     const viewport =
         page.getViewport({
@@ -586,11 +543,13 @@ async function renderPage(
 
 
     /*
-       Container da página.
+       Container.
     */
 
     const pageElement =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
 
     pageElement.className =
@@ -598,11 +557,13 @@ async function renderPage(
 
 
     pageElement.style.width =
-        viewport.width + "px";
+        viewport.width +
+        "px";
 
 
     pageElement.style.height =
-        viewport.height + "px";
+        viewport.height +
+        "px";
 
 
     /*
@@ -610,7 +571,9 @@ async function renderPage(
     */
 
     const canvas =
-        document.createElement("canvas");
+        document.createElement(
+            "canvas"
+        );
 
 
     canvas.className =
@@ -630,11 +593,13 @@ async function renderPage(
 
 
     canvas.style.width =
-        viewport.width + "px";
+        viewport.width +
+        "px";
 
 
     canvas.style.height =
-        viewport.height + "px";
+        viewport.height +
+        "px";
 
 
     pageElement.appendChild(
@@ -648,31 +613,44 @@ async function renderPage(
 
 
     /*
-       Renderiza o PDF sem as operações
-       de texto.
+       Renderização oficial.
     */
 
-    await renderBackgroundOnly(
-        page,
-        viewport,
-        canvas
-    );
+    const context =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    await page.render({
+
+        canvasContext:
+            context,
+
+        viewport:
+            viewport
+
+    }).promise;
 
 
     /*
-       Cria texto HTML editável.
+       Camada editável.
     */
 
-    const layer =
+    const textLayer =
         await createTextLayer(
+
             page,
+
             viewport,
+
             pageNumber
+
         );
 
 
     pageElement.appendChild(
-        layer.element
+        textLayer.element
     );
 
 
@@ -683,47 +661,50 @@ async function renderPage(
     pageData.push({
 
         page:
-
             pageNumber,
 
         viewport:
-
             viewport,
 
         element:
-
             pageElement,
 
         canvas:
-
             canvas,
 
         textLayer:
-
-            layer.element,
+            textLayer.element,
 
         textItems:
-
-            layer.items
+            textLayer.items
 
     });
 
 }
 
 
-/* ==========================================================
+/* =========================================================
    CARREGAR PDF
-========================================================== */
+========================================================= */
 
-async function loadPDF(file) {
+async function loadPDF(
+    file
+) {
 
-    viewer.innerHTML = "";
+    viewer.innerHTML =
+        "";
 
-    pageData = [];
 
-    currentPdf = null;
+    pageData =
+        [];
 
-    saveBtn.disabled = true;
+
+    currentPdf =
+        null;
+
+
+    saveBtn.disabled =
+        true;
 
 
     try {
@@ -733,20 +714,24 @@ async function loadPDF(file) {
         );
 
 
+        /*
+           Lê o arquivo.
+        */
+
         const buffer =
             await file.arrayBuffer();
 
 
         /*
-           Fazemos uma cópia.
-
-           Isso evita problemas de
-           ArrayBuffer transferido pelo PDF.js.
+           Guarda uma cópia
+           independente.
         */
 
         originalPdfBytes =
             new Uint8Array(
+
                 buffer.slice(0)
+
             );
 
 
@@ -755,19 +740,17 @@ async function loadPDF(file) {
         );
 
 
+        /*
+           Abre com PDF.js.
+        */
+
         const loadingTask =
             pdfjsLib.getDocument({
 
                 data:
                     new Uint8Array(
                         originalPdfBytes
-                    ),
-
-                disableAutoFetch:
-                    false,
-
-                disableStream:
-                    false
+                    )
 
             });
 
@@ -777,20 +760,27 @@ async function loadPDF(file) {
 
 
         setStatus(
+
             currentPdf.numPages +
             " página(s) encontrada(s)."
+
         );
 
 
         /*
-           Renderiza todas as páginas.
+           Renderiza todas
+           as páginas.
         */
 
         for (
+
             let pageNumber = 1;
+
             pageNumber <=
             currentPdf.numPages;
+
             pageNumber++
+
         ) {
 
             const page =
@@ -800,20 +790,27 @@ async function loadPDF(file) {
 
 
             await renderPage(
+
                 page,
+
                 pageNumber
+
             );
 
         }
 
 
         /*
-           Entrega os dados ao editor.
+           Entrega os dados
+           ao editor.
         */
 
         if (
-            typeof window.initializePdfEditor ===
+
+            typeof
+            window.initializePdfEditor ===
             "function"
+
         ) {
 
             window.initializePdfEditor(
@@ -823,29 +820,39 @@ async function loadPDF(file) {
         }
 
 
-        saveBtn.disabled = false;
+        saveBtn.disabled =
+            false;
 
 
         setStatus(
-            "PDF carregado. Clique em qualquer texto para editar."
+
+            "PDF carregado. " +
+            "Clique em qualquer texto para editar."
+
         );
 
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
-        showError(error);
+        showError(
+            error
+        );
 
     }
 
 }
 
 
-/* ==========================================================
-   INPUT DE ARQUIVO
-========================================================== */
+/* =========================================================
+   INPUT
+========================================================= */
 
 fileInput.addEventListener(
+
     "change",
+
     async function () {
 
         const file =
@@ -861,14 +868,18 @@ fileInput.addEventListener(
 
 
         if (
+
             file.type !==
             "application/pdf"
+
         ) {
 
             showError(
+
                 new Error(
-                    "O arquivo selecionado não é um PDF."
+                    "Selecione um arquivo PDF válido."
                 )
+
             );
 
             return;
@@ -876,27 +887,10 @@ fileInput.addEventListener(
         }
 
 
-        await loadPDF(file);
+        await loadPDF(
+            file
+        );
 
     }
-);
 
-
-/* ==========================================================
-   REDIMENSIONAMENTO
-========================================================== */
-
-window.addEventListener(
-    "resize",
-    function () {
-
-        /*
-           Não recarregamos automaticamente
-           para não perder edições.
-
-           O próximo carregamento utiliza
-           o tamanho atual da tela.
-        */
-
-    }
 );
